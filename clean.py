@@ -11,17 +11,59 @@ make_directorytree_if_not_exists(outputDir)
 # initial job - read and unpivot the votetype data
 voteTypeDataPath = f'{dataDir}{os.sep}aus-type.csv'
 voteTypeData = pd.read_csv(voteTypeDataPath, skiprows=1)
-# print(voteTypeData)
 
+# calculate totals for the division
+voteTypeTotals = voteTypeData.groupby(['DivisionNm']).sum().reset_index()
+voteTypeTotals = voteTypeTotals[['DivisionNm','OrdinaryVotes','AbsentVotes','ProvisionalVotes','PrePollVotes','PostalVotes','TotalVotes']]
+voteTypeTotals['PartyAb'] = 'Total'
+
+# calculate formal totals for the division
+voteTypeDataFormal = voteTypeData[voteTypeData.PartyNm != 'Informal']
+voteTypeTotalsFormal = voteTypeDataFormal.groupby(['DivisionNm']).sum().reset_index()
+voteTypeTotalsFormal = voteTypeTotalsFormal[['DivisionNm','OrdinaryVotes','AbsentVotes','ProvisionalVotes','PrePollVotes','PostalVotes','TotalVotes']]
+voteTypeTotalsFormal['PartyAb'] = 'Total Formal'
+
+# add to series
+voteTypeData = pd.concat([voteTypeData,voteTypeTotals])
+voteTypeData = pd.concat([voteTypeData,voteTypeTotalsFormal])
+voteTypeData.sort_values(by=['DivisionNm','PartyAb'], inplace=True)
+
+# unpivot
 voteTypeDataUnpivot = pd.melt(
     voteTypeData,
     id_vars=['StateAb','DivisionID','DivisionNm','CandidateID','Surname','GivenNm','BallotPosition','Elected','HistoricElected','PartyAb','PartyNm'],
-    value_vars=['OrdinaryVotes','AbsentVotes','ProvisionalVotes','PrePollVotes','PostalVotes','TotalVotes','Swing'],
+    value_vars=['OrdinaryVotes','AbsentVotes','ProvisionalVotes','PrePollVotes','PostalVotes','TotalVotes'], # excluding swing
     var_name='type',
-    value_name='value'
+    value_name='votes'
 )
 
-voteTypeDataUnpivotFileName = 'aus-type-unpivot'
+# pull out formal votes
+voteTypeDataUnpivotTotalFormal = voteTypeDataUnpivot[voteTypeDataUnpivot['PartyAb'] == 'Total Formal']
+voteTypeDataUnpivotTotalFormal = voteTypeDataUnpivotTotalFormal[['DivisionNm','type','votes']]
+voteTypeDataUnpivotTotalFormal.rename({'votes':'Total Formal Primary Votes'}, axis=1, inplace=True)
+
+# pull out all votes
+voteTypeDataUnpivotTotal = voteTypeDataUnpivot[voteTypeDataUnpivot['PartyAb'] == 'Total']
+voteTypeDataUnpivotTotal = voteTypeDataUnpivotTotal[['DivisionNm','type','votes']]
+voteTypeDataUnpivotTotal.rename({'votes':'Total Primary Votes'}, axis=1, inplace=True)
+
+# merge in for totals
+voteTypeDataUnpivot = voteTypeDataUnpivot.merge(voteTypeDataUnpivotTotalFormal, on=['type','DivisionNm'])
+voteTypeDataUnpivot = voteTypeDataUnpivot.merge(voteTypeDataUnpivotTotal, on=['type','DivisionNm'])
+
+# Proportions calc
+voteTypeDataUnpivot['VotesPcTotal'] = voteTypeDataUnpivot["votes"].div(voteTypeDataUnpivot["Total Primary Votes"].values)
+voteTypeDataUnpivot['VotesPcFormalTotal'] = voteTypeDataUnpivot['votes'].div(voteTypeDataUnpivot['Total Formal Primary Votes'].values)
+
+# What we want is informal as % total, votes % total formal 
+voteTypeDataUnpivot["VotesPc"] = np.where(
+    voteTypeDataUnpivot["PartyNm"] == "Informal",
+    voteTypeDataUnpivot["votes"]/voteTypeDataUnpivot["Total Primary Votes"],
+    voteTypeDataUnpivot["votes"]/voteTypeDataUnpivot["Total Formal Primary Votes"]
+) 
+
+# save
+voteTypeDataUnpivotFileName = 'aus-type-unpivot-pc'
 voteTypeDataUnpivotFilePath = f'{outputDir}{os.sep}{voteTypeDataUnpivotFileName}.csv'
 
 voteTypeDataUnpivot.to_csv(voteTypeDataUnpivotFilePath, index=False)
@@ -55,7 +97,6 @@ primaryData.to_csv(primaryDataUnpivotFilePath, index=False)
 # add proportions to primary data
 primaryDataPath = f'{outputDir}{os.sep}aus-p.csv'
 primaryData = pd.read_csv(primaryDataPath)
-print(primaryData)
 
 # work out total column
 # joint booths have different PollingPlaceIDs
@@ -70,7 +111,6 @@ primaryTotalFormal = primaryDataFormal.groupby(['PollingPlaceID']).sum()['Ordina
 primaryTotalFormal.rename({'OrdinaryVotes':'Total Formal Primary Votes'}, axis=1, inplace=True)
 
 primaryData = primaryData.merge(primaryTotalFormal, on='PollingPlaceID')
-
 
 # Proportions calc
 primaryData['OrdinaryVotesPcTotal'] = primaryData["OrdinaryVotes"].div(primaryData["Total Primary Votes"].values)
