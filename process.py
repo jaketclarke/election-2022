@@ -60,14 +60,22 @@ merge.drop(['PartyAb_x', 'PartyAb_y', 'VotesPc_x', 'VotesPc_y'], axis=1, inplace
 # create sum var
 merge['weight'] = merge['VotesSA1'] * merge['VotesPc']
 
+# from initial throw, delete informal
+merge=merge.dropna(subset=['PartyAb'])
+
 total = merge.groupby('sa1_2016').sum()['weight'].reset_index()
-total.rename({'weight': 'denominator'}, axis=1, inplace=True)
+total.rename({'weight': 'primary_total_votes'}, axis=1, inplace=True)
 
 groups = merge.groupby(['sa1_2016','PartyAb']).sum()['weight'].reset_index()
-groups.rename({'weight': 'numerator'}, axis=1, inplace=True)
+groups.rename({'weight': 'primary_votes'}, axis=1, inplace=True)
 
 sa1Votes = groups.merge(total, on='sa1_2016')
-sa1Votes['primary_pc'] = sa1Votes['numerator'] / sa1Votes['denominator']
+sa1Votes['primary_pc'] = sa1Votes['primary_votes'] / sa1Votes['primary_total_votes']
+
+# clean
+sa1Votes.primary_votes = sa1Votes.primary_votes.round(0)
+sa1Votes.primary_total_votes = sa1Votes.primary_total_votes.round(0)
+sa1Votes.primary_pc = sa1Votes.primary_pc.round(4)
 
 # unpivoted data
 sa1VotesPath = f'{outputDir}{os.sep}f2022_fp_by_sa1_2016_aus.csv'
