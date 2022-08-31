@@ -5,7 +5,7 @@ import pandas as pd
 from functions import empty_directory, make_directorytree_if_not_exists
 
 outputDir = 'output'
-dataDir = 'test'
+dataDir = 'data'
 make_directorytree_if_not_exists(outputDir)
 
 # sa1 data
@@ -78,5 +78,11 @@ sa1Votes.primary_total_votes = sa1Votes.primary_total_votes.round(0)
 sa1Votes.primary_pc = sa1Votes.primary_pc.round(4)
 
 # unpivoted data
-sa1VotesPath = f'{outputDir}{os.sep}f2022_fp_by_sa1_2016_aus.csv'
-sa1Votes.to_csv(sa1VotesPath, index=False)
+sa1VotesPathUnpivot = f'{outputDir}{os.sep}f2022_fp_by_sa1_2016_aus_unpivot.csv'
+sa1Votes.to_csv(sa1VotesPathUnpivot, index=False)
+
+# pivot
+sa1VotesPivoted = pd.pivot_table(sa1Votes, values='primary_pc', index='sa1_2016', columns=['PartyAb']).reset_index().fillna(0)
+
+sa1VotesPathPivoted = f'{outputDir}{os.sep}f2022_fp_by_sa1_2016_aus.csv'
+sa1VotesPivoted.to_csv(sa1VotesPathPivoted, index=False)
