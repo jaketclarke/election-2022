@@ -8,6 +8,8 @@ wget = "*"
 pandas = "*"
 geopandas = "*"
 numpy = "*"
+ipykernel = "*"
+matplotlib = "*"
 
 [dev-packages]
 
